@@ -1991,10 +1991,14 @@ impl AsyncCx {
                 Poll::Ready(t) => break Ok(t),
                 Poll::Pending => {}
             }
-            //let previous_mask = mpk::current_mask();
-            //mpk::allow(ProtectionMask::all());
-            (*suspend).suspend(())?;
-            //mpk::allow(previous_mask);
+            if self.mpk_enabled {
+                let previous_mask = mpk::current_mask();
+                mpk::allow(ProtectionMask::all());
+                (*suspend).suspend(())?;
+                mpk::allow(previous_mask);
+            } else {
+                (*suspend).suspend(())?;
+            }
         }
     }
 }
