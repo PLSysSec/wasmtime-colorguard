@@ -95,10 +95,11 @@ use std::ptr;
 use std::sync::atomic::AtomicU64;
 use std::sync::Arc;
 use std::task::{Context, Poll};
+use wasmtime_runtime::mpk::{self, ProtectionKey, ProtectionMask};
 use wasmtime_runtime::{
-    mpk::ProtectionKey, ExportGlobal, InstanceAllocationRequest, InstanceAllocator, InstanceHandle,
-    ModuleInfo, OnDemandInstanceAllocator, SignalHandler, StoreBox, StorePtr, VMContext,
-    VMExternRef, VMExternRefActivationsTable, VMFuncRef, VMRuntimeLimits, WasmFault,
+    ExportGlobal, InstanceAllocationRequest, InstanceAllocator, InstanceHandle, ModuleInfo,
+    OnDemandInstanceAllocator, SignalHandler, StoreBox, StorePtr, VMContext, VMExternRef,
+    VMExternRefActivationsTable, VMFuncRef, VMRuntimeLimits, WasmFault,
 };
 
 mod context;
@@ -1397,6 +1398,7 @@ impl StoreOpaque {
         Some(AsyncCx {
             current_suspend: self.async_state.current_suspend.get(),
             current_poll_cx: poll_cx_box_ptr,
+            mpk_enabled: self.pkey.is_some(),
         })
     }
 
@@ -1929,6 +1931,7 @@ impl<T> StoreContextMut<'_, T> {
 pub struct AsyncCx {
     current_suspend: *mut *const wasmtime_fiber::Suspend<Result<()>, (), Result<()>>,
     current_poll_cx: *mut *mut Context<'static>,
+    mpk_enabled: bool,
 }
 
 #[cfg(feature = "async")]
@@ -1988,8 +1991,10 @@ impl AsyncCx {
                 Poll::Ready(t) => break Ok(t),
                 Poll::Pending => {}
             }
-
+            //let previous_mask = mpk::current_mask();
+            //mpk::allow(ProtectionMask::all());
             (*suspend).suspend(())?;
+            //mpk::allow(previous_mask);
         }
     }
 }
